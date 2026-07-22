@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoodTracka</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <section id="homePage" class="page active">
+      <p class="label">MOODTRACKA</p>
+
+      <h1 class="page-title">How are you feeling?</h1>
+
+      <p class="subtitle">
+        Track your emotions, spot patterns, and<br />
+        take care of yourself.
+      </p>
+
+      <section class="card-grid">
+        <button class="card purple" data-target="themes" type="button">
+          <div class="icon">🎨</div>
+          <h2>Theme</h2>
+          <p>Customise colours and display to match your mood.</p>
+        </button>
+
+        <button class="card green" type="button">
+          <div class="icon">📊</div>
+          <h2>Stats</h2>
+          <p>See your mood patterns over time with clear charts.</p>
+        </button>
+
+        <button class="card orange" type="button">
+          <div class="glow"></div>
+          <h2>Help</h2>
+          <p>Guidance and resources for your wellbeing.</p>
+        </button>
+
+        <button class="card blue" type="button">
+          <div class="icon">📝</div>
+          <h2>Entries</h2>
+          <p>View and reflect on all your past mood logs.</p>
+        </button>
+      </section>
+
+      <footer>MoodTracka — built for high school students</footer>
+    </section>
+
+    <section id="themesPage" class="page">
+      <button class="back-btn" data-action="home" type="button">← Back</button>
+
+      <p class="label">THEMES</p>
+      <h2 class="themes-title">Choose a calming look</h2>
+      <p class="subtitle">Pick a gentle palette or create your own for a more personal space.</p>
+
+      <div class="preset-grid">
+        <button class="preset-card" data-theme="calm-dawn" type="button">
+          <h3>Calm Dawn</h3>
+          <p>Soft peach and sky blue for a reassuring start.</p>
+        </button>
+
+        <button class="preset-card" data-theme="forest-breathe" type="button">
+          <h3>Forest Breathe</h3>
+          <p>Earthy greens and misty tones that feel restful.</p>
+        </button>
+
+        <button class="preset-card" data-theme="night-sky" type="button">
+          <h3>Night Sky</h3>
+          <p>Deep violet and quiet blue for a soothing evening.</p>
+        </button>
+
+        <button class="preset-card" data-theme="sunshine-glow" type="button">
+          <h3>Sunshine Glow</h3>
+          <p>Warm gold and gentle coral for a hopeful mood.</p>
+        </button>
+      </div>
+
+      <div class="customizer">
+        <div class="theme-preview">
+          <div class="preview-icon">☁️</div>
+          <h3>Your custom theme</h3>
+          <p>Adjust the colours to create a reflection of your mood.</p>
+        </div>
+
+        <div class="controls">
+          <label>
+            Background
+            <input id="bgColor" type="color" value="#0f1018" />
+          </label>
+          <label>
+            Surface
+            <input id="surfaceColor" type="color" value="#1b1c27" />
+          </label>
+          <label>
+            Accent
+            <input id="accentColor" type="color" value="#a78bfa" />
+          </label>
+          <label>
+            Accent 2
+            <input id="accent2Color" type="color" value="#60a5fa" />
+          </label>
+          <label>
+            Text
+            <input id="textColor" type="color" value="#e5e7eb" />
+          </label>
+          <label>
+            Muted text
+            <input id="mutedColor" type="color" value="#64748b" />
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
