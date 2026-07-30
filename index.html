@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Main app container that holds all the pages -->
   <main class="container">
+    <!-- Home page: the main landing screen -->
     <section id="homePage" class="page active">
       <p class="label">MOODTRACKA</p>
 
@@ -18,23 +20,25 @@
         take care of yourself.
       </p>
 
+      <!-- Main navigation cards on the home screen -->
       <section class="card-grid">
+        <!-- Theme card -->
         <button class="card purple" data-target="themes" type="button">
           <div class="icon">🎨</div>
           <h2>Theme</h2>
           <p>Customise colours and display to match your mood.</p>
         </button>
 
-        <button class="card green" type="button">
+        <button class="card green" data-target="stats" type="button">
           <div class="icon">📊</div>
           <h2>Stats</h2>
           <p>See your mood patterns over time with clear charts.</p>
         </button>
 
-        <button class="card orange" type="button">
-          <div class="glow"></div>
-          <h2>Help</h2>
-          <p>Guidance and resources for your wellbeing.</p>
+        <button class="card orange" data-target="mood" type="button">
+          <div class="icon">🌤️</div>
+          <h2>Mood</h2>
+          <p>Log how you feel today and keep a quick note.</p>
         </button>
 
         <button class="card blue" type="button">
@@ -47,6 +51,7 @@
       <footer>MoodTracka — built for high school students</footer>
     </section>
 
+    <!-- Themes page: lets the user choose a visual style -->
     <section id="themesPage" class="page">
       <button class="back-btn" data-action="home" type="button">← Back</button>
 
@@ -54,6 +59,7 @@
       <h2 class="themes-title">Choose a calming look</h2>
       <p class="subtitle">Pick a gentle palette or create your own for a more personal space.</p>
 
+      <!-- Theme preset choices -->
       <div class="preset-grid">
         <button class="preset-card" data-theme="calm-dawn" type="button">
           <h3>Calm Dawn</h3>
@@ -76,6 +82,7 @@
         </button>
       </div>
 
+      <!-- Custom theme editor -->
       <div class="customizer">
         <div class="theme-preview">
           <div class="preview-icon">☁️</div>
@@ -109,6 +116,64 @@
             <input id="mutedColor" type="color" value="#64748b" />
           </label>
         </div>
+      </div>
+    </section>
+
+    <!-- Mood page: lets the user log a quick daily mood entry -->
+    <section id="moodPage" class="page">
+      <button class="back-btn" data-action="home" type="button">← Back</button>
+
+      <p class="label">TRACK MOOD</p>
+      <h2 class="themes-title">How are you feeling today?</h2>
+      <p class="subtitle">Pick a mood and add a quick note to remember it.</p>
+
+      <div class="mood-card">
+        <div class="mood-options">
+          <button class="mood-btn active" data-mood="calm" type="button">😌 Calm</button>
+          <button class="mood-btn" data-mood="happy" type="button">😊 Happy</button>
+          <button class="mood-btn" data-mood="tired" type="button">😴 Tired</button>
+          <button class="mood-btn" data-mood="stressed" type="button">😵 Stressed</button>
+        </div>
+
+        <label class="mood-note">
+          <span>Note</span>
+          <textarea id="moodNote" rows="4" placeholder="What is going on for you today?"></textarea>
+        </label>
+
+        <button id="saveMoodBtn" class="save-btn" type="button">Save entry</button>
+        <p id="moodMessage" class="mood-message">Your latest mood will appear here.</p>
+      </div>
+    </section>
+
+    <!-- Stats page: shows a quick snapshot of recent mood patterns -->
+    <section id="statsPage" class="page">
+      <button class="back-btn" data-action="home" type="button">← Back</button>
+
+      <p class="label">STATS</p>
+      <h2 class="themes-title">Your mood snapshot</h2>
+      <p class="subtitle">A simple look at how your week has felt so far.</p>
+
+      <div class="stats-grid">
+        <article class="stat-card">
+          <h3>Check-ins</h3>
+          <p class="stat-value" id="checkinCount">12</p>
+          <span>entries this month</span>
+        </article>
+        <article class="stat-card">
+          <h3>Most common</h3>
+          <p class="stat-value" id="mostCommonMood">—</p>
+          <span>your steady mood</span>
+        </article>
+        <article class="stat-card">
+          <h3>Streak</h3>
+          <p class="stat-value" id="streakValue">0 days</p>
+          <span>keeping the habit</span>
+        </article>
+      </div>
+
+      <div class="chart-card">
+        <h3>Mood balance</h3>
+        <div id="statsChart"></div>
       </div>
     </section>
   </main>

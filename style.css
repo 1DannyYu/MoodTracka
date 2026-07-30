@@ -1,9 +1,11 @@
+/* --- Basic reset --- */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* --- Theme variables --- */
 :root {
   --bg: #0f1018;
   --surface: #1b1c27;
@@ -17,6 +19,7 @@
   --glow-soft: #ffb45c;
 }
 
+/* --- Page layout --- */
 body {
   min-height: 100vh;
   font-family: Arial, sans-serif;
@@ -27,6 +30,7 @@ body {
   align-items: center;
 }
 
+/* Main content container */
 .container {
   width: 100%;
   max-width: 1000px;
@@ -34,6 +38,7 @@ body {
   text-align: center;
 }
 
+/* Pages are hidden until they are made active */
 .page {
   display: none;
 }
@@ -42,6 +47,7 @@ body {
   display: block;
 }
 
+/* --- Typography --- */
 .label {
   letter-spacing: 8px;
   color: var(--muted);
@@ -53,6 +59,7 @@ body {
   font-size: 64px;
   line-height: 1.1;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 25px;
@@ -62,6 +69,7 @@ body {
   font-size: 40px;
   line-height: 1.1;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 25px;
@@ -74,6 +82,7 @@ body {
   margin-bottom: 70px;
 }
 
+/* --- Home page cards --- */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -157,6 +166,7 @@ body {
   transition: 0.25s ease;
 }
 
+/* --- Theme preset cards --- */
 .preset-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -260,6 +270,129 @@ footer {
   margin-top: 55px;
 }
 
+/* --- Mood tracking page --- */
+.mood-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-strong);
+  border-radius: 24px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+
+.mood-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mood-btn,
+.save-btn {
+  border: 1px solid var(--surface-strong);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--surface-strong);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mood-btn.active,
+.save-btn {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #111827;
+  font-weight: 700;
+}
+
+.mood-note {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.mood-note textarea {
+  width: 100%;
+  border: 1px solid var(--surface-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.mood-message {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* --- Stats page --- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.stat-card,
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-strong);
+  border-radius: 22px;
+  padding: 20px;
+  text-align: left;
+}
+
+.stat-card h3,
+.chart-card h3 {
+  margin-bottom: 10px;
+  font-size: 20px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.stat-card span {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.chart-card {
+  display: grid;
+  gap: 12px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 36px;
+  gap: 10px;
+  align-items: center;
+}
+
+.bar-track {
+  height: 10px;
+  background: var(--surface-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.chart-row span,
+.chart-row strong {
+  font-size: 14px;
+}
+
+.chart-row strong {
+  color: var(--text);
+}
+
+/* --- Responsive design --- */
 @media (max-width: 700px) {
   .page-title {
     font-size: 42px;
@@ -271,7 +404,9 @@ footer {
 
   .card-grid,
   .preset-grid,
-  .customizer {
+  .customizer,
+  .stats-grid,
+  .mood-options {
     grid-template-columns: 1fr;
   }
 
