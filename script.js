@@ -1,13 +1,134 @@
 // Get the page sections so the app can switch between them.
+const loginPageSection = document.getElementById("loginPage");
 const homePageSection = document.getElementById("homePage");
 const themesPageSection = document.getElementById("themesPage");
 const moodPageSection = document.getElementById("moodPage");
 const entriesPageSection = document.getElementById("entriesPage");
 const statsPageSection = document.getElementById("statsPage");
-const pageSections = [homePageSection, themesPageSection, moodPageSection, entriesPageSection, statsPageSection];
+const pageSections = [loginPageSection, homePageSection, themesPageSection, moodPageSection, entriesPageSection, statsPageSection];
+
+const storagePrefix = "MoodTracka";
+const activeStudentStorageKey = `${storagePrefix}:activeStudentId`;
+const accountBadge = document.getElementById("activeStudentBadge");
+const switchAccountButton = document.getElementById("switchAccountBtn");
+const studentIdInput = document.getElementById("studentIdInput");
+const loginButton = document.getElementById("loginBtn");
+const loginMessage = document.getElementById("loginMessage");
+
+function normalizeStudentId(value) {
+  return String(value || "").replace(/\s+/g, "").trim();
+}
+
+function getActiveStudentId() {
+  return normalizeStudentId(localStorage.getItem(activeStudentStorageKey));
+}
+
+function getStudentStorageKey(studentId, suffix) {
+  return `${storagePrefix}:student:${studentId}:${suffix}`;
+}
+
+function getCurrentStudentStorageKey(suffix) {
+  const studentId = getActiveStudentId();
+  return studentId ? getStudentStorageKey(studentId, suffix) : null;
+}
+
+function updateActiveStudentBadge() {
+  const studentId = getActiveStudentId();
+
+  if (accountBadge) {
+    accountBadge.textContent = studentId ? `Logged in as ${studentId}` : "Not logged in";
+  }
+
+  if (switchAccountButton) {
+    switchAccountButton.textContent = studentId ? "Switch account" : "Log in";
+  }
+}
+
+function clearAccountState() {
+  selectedEntryIndices.clear();
+  updateActiveStudentBadge();
+}
+
+function setActiveStudentId(studentId) {
+  const nextStudentId = normalizeStudentId(studentId);
+
+  if (!/^\d+$/.test(nextStudentId)) {
+    return false;
+  }
+
+  localStorage.setItem(activeStudentStorageKey, nextStudentId);
+  clearAccountState();
+  refreshStatsVisuals();
+  renderMoodEntries();
+  return true;
+}
+
+function logoutStudent() {
+  localStorage.removeItem(activeStudentStorageKey);
+  clearAccountState();
+  refreshStatsVisuals();
+  renderMoodEntries();
+  showPage("login");
+}
+
+function openStudentSession(studentId) {
+  if (!setActiveStudentId(studentId)) {
+    if (loginMessage) {
+      loginMessage.textContent = "Enter a valid student ID number to continue.";
+    }
+    return false;
+  }
+
+  if (studentIdInput) {
+    studentIdInput.value = getActiveStudentId();
+  }
+
+  if (loginMessage) {
+    loginMessage.textContent = `Logged in as ${getActiveStudentId()}.`;
+  }
+
+  const savedTheme = loadThemeForActiveStudent();
+  applyTheme(savedTheme, false);
+  resetMoodForm();
+  showPage("home");
+  return true;
+}
+
+function loadThemeForActiveStudent() {
+  const storageKey = getCurrentStudentStorageKey("theme");
+
+  if (!storageKey) {
+    return themePresets["night-sky"];
+  }
+
+  try {
+    const rawTheme = localStorage.getItem(storageKey);
+    if (!rawTheme) {
+      return themePresets["night-sky"];
+    }
+
+    return JSON.parse(rawTheme);
+  } catch (error) {
+    return themePresets["night-sky"];
+  }
+}
+
+function saveThemeForActiveStudent(themeValues) {
+  const storageKey = getCurrentStudentStorageKey("theme");
+
+  if (!storageKey) {
+    return;
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify(themeValues));
+}
 
 // Show the requested page and hide the others.
 function showPage(pageName) {
+  if (pageName !== "login" && !getActiveStudentId()) {
+    pageName = "login";
+  }
+
   const targetPageId = `${pageName}Page`;
 
   pageSections.forEach(page => {
@@ -15,12 +136,15 @@ function showPage(pageName) {
   });
 
   if (pageName === "stats") {
-    updateMoodStats();
-    renderStatsChart();
+    refreshStatsVisuals();
   }
 
   if (pageName === "entries") {
     renderMoodEntries();
+  }
+
+  if (pageName === "login") {
+    updateActiveStudentBadge();
   }
 }
 
@@ -118,7 +242,7 @@ const themePresets = {
 };
 
 // Apply the selected theme by updating CSS custom properties.
-function applyTheme(themeValues) {
+function applyTheme(themeValues, shouldPersist = true) {
   const resolvedTheme = {
     bg: themeValues.bg ?? themeColorInputs.bgColor.value,
     surface: themeValues.surface ?? themeColorInputs.surfaceColor.value,
@@ -152,6 +276,10 @@ function applyTheme(themeValues) {
   themeColorInputs.accent2Color.value = resolvedTheme.accent2;
   themeColorInputs.textColor.value = resolvedTheme.text;
   themeColorInputs.mutedColor.value = resolvedTheme.muted;
+
+  if (shouldPersist) {
+    saveThemeForActiveStudent(resolvedTheme);
+  }
 }
 
 // Switch to a preset theme when a preset card is clicked.
@@ -184,8 +312,14 @@ Object.values(themeColorInputs).forEach(input => {
 
 // Keep the stats view in sync with the entries the user saves.
 function getMoodEntries() {
+  const storageKey = getCurrentStudentStorageKey("entries");
+
+  if (!storageKey) {
+    return [];
+  }
+
   // Read raw entries and normalize them so date handling is consistent.
-  const raw = JSON.parse(localStorage.getItem("moodEntries") || "[]");
+  const raw = JSON.parse(localStorage.getItem(storageKey) || "[]");
 
   const normalized = raw.map(entry => {
     const e = Object.assign({}, entry);
@@ -216,7 +350,7 @@ function getMoodEntries() {
 
   // Persist cleaned entries back to storage so future reads are simpler.
   try {
-    localStorage.setItem("moodEntries", JSON.stringify(normalized));
+    localStorage.setItem(storageKey, JSON.stringify(normalized));
   } catch (err) {
     // If storage fails, ignore — we still return normalized data for this session.
   }
@@ -283,33 +417,251 @@ function updateMoodStats() {
   if (streakEl) streakEl.textContent = `${getStreak(entries)} day${getStreak(entries) === 1 ? "" : "s"}`;
 }
 
-// Build a compact bar chart for the stats page from saved entries.
+const moodColorMap = {
+  calm: "var(--accent)",
+  happy: "var(--accent-2)",
+  tired: "var(--glow)",
+  stressed: "var(--muted)"
+};
+
+const moodScoreMap = {
+  calm: 4,
+  happy: 5,
+  tired: 2,
+  stressed: 1,
+  unknown: 2
+};
+
+function getMoodTotals(entries) {
+  const totals = { calm: 0, happy: 0, tired: 0, stressed: 0 };
+
+  entries.forEach(entry => {
+    if (totals[entry.mood] !== undefined) {
+      totals[entry.mood] += 1;
+    }
+  });
+
+  return totals;
+}
+
+function refreshStatsVisuals() {
+  updateMoodStats();
+  renderStatsChart();
+  renderWeeklyTrendChart();
+  renderMoodBreakdownChart();
+}
+
 function renderStatsChart() {
   const chart = document.getElementById("statsChart");
   if (!chart) return;
 
-  const entries = JSON.parse(localStorage.getItem("moodEntries") || "[]");
-  const summary = entries.reduce((acc, entry) => {
-    acc[entry.mood] = (acc[entry.mood] || 0) + 1;
-    return acc;
-  }, {});
+  const entries = getMoodEntries();
+  const summary = getMoodTotals(entries);
 
   const chartData = [
-    { label: "Calm", value: summary.calm || 0, color: "var(--accent)" },
-    { label: "Happy", value: summary.happy || 0, color: "var(--accent-2)" },
-    { label: "Tired", value: summary.tired || 0, color: "var(--glow)" },
-    { label: "Stressed", value: summary.stressed || 0, color: "var(--muted)" }
+    { label: "Calm", value: summary.calm || 0, color: moodColorMap.calm },
+    { label: "Happy", value: summary.happy || 0, color: moodColorMap.happy },
+    { label: "Tired", value: summary.tired || 0, color: moodColorMap.tired },
+    { label: "Stressed", value: summary.stressed || 0, color: moodColorMap.stressed }
   ];
+
+  const maxValue = Math.max(...chartData.map(item => item.value), 1);
 
   chart.innerHTML = chartData.map(item => `
     <div class="chart-row">
       <span>${item.label}</span>
       <div class="bar-track">
-        <div class="bar-fill" style="width:${Math.max(item.value, 1) * 14}%; background:${item.color};"></div>
+        <div class="bar-fill" style="width:${(item.value / maxValue) * 100}%; background:${item.color};"></div>
       </div>
       <strong>${item.value}</strong>
     </div>
   `).join("");
+}
+
+function renderWeeklyTrendChart() {
+  const chart = document.getElementById("weeklyTrendChart");
+  if (!chart) return;
+
+  const entries = getMoodEntries();
+
+  if (!entries.length) {
+    chart.innerHTML = '<div class="chart-empty">Log a few moods to unlock the weekly trend.</div>';
+    return;
+  }
+
+  const newestDate = entries
+    .map(entry => entry.date)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))[0];
+
+  const endDate = newestDate ? new Date(`${newestDate}T12:00:00`) : new Date();
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(endDate);
+    date.setDate(endDate.getDate() - (6 - index));
+    date.setHours(0, 0, 0, 0);
+    return date.toISOString().slice(0, 10);
+  });
+
+  const trend = dates.map(date => {
+    const dayEntries = entries.filter(entry => entry.date === date);
+    const average = dayEntries.length
+      ? dayEntries.reduce((sum, entry) => sum + (moodScoreMap[entry.mood] || moodScoreMap.unknown), 0) / dayEntries.length
+      : 0;
+
+    const dominantMood = dayEntries.length
+      ? Object.entries(dayEntries.reduce((acc, entry) => {
+          acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1])[0][0]
+      : "no-entry";
+
+    return {
+      date,
+      label: new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" }),
+      value: average,
+      moodLabel: dayEntries.length ? formatMoodLabel(dominantMood) : "No entry",
+      hasEntry: dayEntries.length > 0
+    };
+  });
+
+  const values = trend.map(day => day.value).filter(value => value > 0);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 5);
+  const width = 280;
+  const height = 150;
+  const padding = 18;
+  const usableWidth = width - padding * 2;
+  const usableHeight = height - padding * 2;
+  const baselineY = height - padding;
+
+  const entryIndexes = trend
+    .map((day, index) => (day.hasEntry ? index : null))
+    .filter(index => index !== null);
+
+  function getYForDay(index, dayValue = 0) {
+    const previousIndex = [...entryIndexes].reverse().find(entryIndex => entryIndex < index);
+    const nextIndex = entryIndexes.find(entryIndex => entryIndex > index);
+    const referenceValue = dayValue || (previousIndex !== undefined ? trend[previousIndex].value : nextIndex !== undefined ? trend[nextIndex].value : 0);
+
+    return baselineY - ((referenceValue - min) / (max - min || 1)) * usableHeight;
+  }
+
+  const points = trend.map((day, index) => {
+    const x = padding + (trend.length === 1 ? usableWidth / 2 : (usableWidth / (trend.length - 1)) * index);
+    const y = day.hasEntry ? getYForDay(index, day.value) : getYForDay(index);
+    return { ...day, x, y };
+  });
+
+  const averageMoodScore = values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0;
+  const lineColor = averageMoodScore >= 4 ? "var(--accent)" : averageMoodScore >= 3 ? "var(--accent-2)" : averageMoodScore >= 2 ? "var(--glow)" : "var(--muted)";
+
+  const linePath = points.map((point, index) => {
+    const command = index === 0 ? "M" : "L";
+    return `${command} ${point.x} ${point.y}`;
+  }).join(" ");
+
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`;
+
+  const pointMarkup = points.filter(point => point.hasEntry).map(point => {
+    const shortLabel = point.moodLabel.charAt(0);
+    return `
+      <g>
+        <circle cx="${point.x}" cy="${point.y}" r="4" class="trend-point" />
+        <text x="${point.x}" y="${point.y - 11}" text-anchor="middle" class="trend-label">${shortLabel}</text>
+      </g>
+    `;
+  }).join("");
+
+  const legendMarkup = Object.entries(moodColorMap).map(([mood, color]) => `
+    <span class="trend-legend-item">
+      <span class="trend-legend-swatch" style="background:${color};"></span>
+      ${formatMoodLabel(mood)}
+    </span>
+  `).join("");
+
+  chart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="7-day mood trend">
+      <path d="${areaPath}" class="trend-area" />
+      <path d="${linePath}" class="trend-line" style="stroke:${lineColor};" />
+      ${pointMarkup}
+    </svg>
+    <div class="trend-legend">${legendMarkup}</div>
+    <div class="trend-labels">
+      ${trend.map(day => `<span>${day.label}</span>`).join("")}
+    </div>
+  `;
+}
+
+function renderMoodBreakdownChart() {
+  const chart = document.getElementById("moodDonutChart");
+  if (!chart) return;
+
+  const entries = getMoodEntries();
+  const totals = getMoodTotals(entries);
+  const totalEntries = Object.values(totals).reduce((sum, value) => sum + value, 0);
+
+  if (!totalEntries) {
+    chart.innerHTML = '<div class="chart-empty">No entries yet.</div>';
+    return;
+  }
+
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  let currentOffset = 0;
+
+  const segments = Object.entries(moodColorMap)
+    .map(([mood, color]) => {
+      const value = totals[mood] || 0;
+      const ratio = value / totalEntries;
+      const dash = ratio * circumference;
+      const segment = `
+        <circle
+          cx="56"
+          cy="56"
+          r="${radius}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="14"
+          stroke-dasharray="${dash} ${circumference - dash}"
+          stroke-dashoffset="${-currentOffset}"
+          transform="rotate(-90 56 56)"
+          stroke-linecap="round"
+        />
+      `;
+      currentOffset += dash;
+      return segment;
+    })
+    .join("");
+
+  const legend = Object.entries(moodColorMap)
+    .map(([mood, color]) => {
+      const value = totals[mood] || 0;
+      const percentage = totalEntries ? Math.round((value / totalEntries) * 100) : 0;
+      return `
+        <div class="donut-legend-row">
+          <span class="legend-swatch" style="background:${color};"></span>
+          <span>${formatMoodLabel(mood)}</span>
+          <strong>${percentage}%</strong>
+        </div>
+      `;
+    })
+    .join("");
+
+  chart.innerHTML = `
+    <div class="donut-wrap">
+      <svg viewBox="0 0 112 112" aria-label="mood distribution chart">
+        <circle cx="56" cy="56" r="${radius}" fill="none" stroke="rgba(148, 163, 184, 0.15)" stroke-width="14" />
+        ${segments}
+      </svg>
+      <div class="donut-center">
+        <strong>${totalEntries}</strong>
+        <span>entries</span>
+      </div>
+    </div>
+    <div class="donut-legend">${legend}</div>
+  `;
 }
 
 function renderMoodEntries() {
@@ -354,7 +706,13 @@ function renderMoodEntries() {
 }
 
 function saveMoodEntries(entries) {
-  localStorage.setItem("moodEntries", JSON.stringify(entries));
+  const storageKey = getCurrentStudentStorageKey("entries");
+
+  if (!storageKey) {
+    return;
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify(entries));
 }
 
 const allowedMoods = ["calm", "happy", "tired", "stressed"];
@@ -404,8 +762,7 @@ function deleteEntriesByIndices(entryIndices) {
 
   saveMoodEntries(entries);
   clearSelectedEntries();
-  updateMoodStats();
-  renderStatsChart();
+  refreshStatsVisuals();
   renderMoodEntries();
 }
 
@@ -428,8 +785,7 @@ function editMoodEntry(entryIndex) {
   };
 
   saveMoodEntries(entries);
-  updateMoodStats();
-  renderStatsChart();
+  refreshStatsVisuals();
   renderMoodEntries();
 }
 
@@ -522,8 +878,7 @@ if (confirmResetEntriesButton) {
     saveMoodEntries([]);
     clearSelectedEntries();
     closeResetEntriesModal();
-    updateMoodStats();
-    renderStatsChart();
+    refreshStatsVisuals();
     renderMoodEntries();
   });
 }
@@ -543,6 +898,21 @@ const saveMoodButton = document.getElementById("saveMoodBtn");
 const moodMessage = document.getElementById("moodMessage");
 let selectedMood = "calm";
 
+function resetMoodForm() {
+  selectedMood = "calm";
+  moodButtons.forEach(button => {
+    button.classList.toggle("active", button.dataset.mood === selectedMood);
+  });
+
+  if (moodNoteInput) {
+    moodNoteInput.value = "";
+  }
+
+  if (moodMessage) {
+    moodMessage.textContent = "Your latest mood will appear here.";
+  }
+}
+
 moodButtons.forEach(button => {
   button.addEventListener("click", () => {
     selectedMood = button.dataset.mood;
@@ -550,8 +920,40 @@ moodButtons.forEach(button => {
   });
 });
 
+if (studentIdInput) {
+  studentIdInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      openStudentSession(studentIdInput.value);
+    }
+  });
+}
+
+if (loginButton) {
+  loginButton.addEventListener("click", () => {
+    openStudentSession(studentIdInput?.value || "");
+  });
+}
+
+if (switchAccountButton) {
+  switchAccountButton.addEventListener("click", () => {
+    logoutStudent();
+    if (studentIdInput) {
+      studentIdInput.focus();
+      studentIdInput.select();
+    }
+  });
+}
+
 if (saveMoodButton) {
   saveMoodButton.addEventListener("click", () => {
+    if (!getActiveStudentId()) {
+      showPage("login");
+      if (loginMessage) {
+        loginMessage.textContent = "Log in with a student ID before saving entries.";
+      }
+      return;
+    }
+
     const entries = getMoodEntries();
     entries.push({
       mood: selectedMood,
@@ -563,14 +965,20 @@ if (saveMoodButton) {
     if (moodNoteInput) moodNoteInput.value = "";
     if (moodMessage) moodMessage.textContent = `Saved ${selectedMood} entry.`;
 
-    updateMoodStats();
-    renderStatsChart();
+    refreshStatsVisuals();
     renderMoodEntries();
   });
 }
 
 // Start the app with the night-sky theme and build the stats view.
-applyTheme(themePresets["night-sky"]);
-updateMoodStats();
-renderStatsChart();
-renderMoodEntries();
+// Start the app using the current student's saved session when available.
+updateActiveStudentBadge();
+
+if (getActiveStudentId()) {
+  openStudentSession(getActiveStudentId());
+} else {
+  applyTheme(themePresets["night-sky"], false);
+  resetMoodForm();
+  refreshStatsVisuals();
+  showPage("login");
+}

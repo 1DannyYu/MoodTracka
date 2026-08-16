@@ -9,8 +9,25 @@
 <body>
   <!-- Main app container that holds all the pages -->
   <main class="container">
+    <!-- Login page: asks for the student's ID before showing their data. -->
+    <section id="loginPage" class="page active">
+      <p class="label">WELCOME</p>
+      <h1 class="page-title">Log in with your student ID</h1>
+      <p class="subtitle">Each student gets their own saved mood entries and theme settings on this device.</p>
+
+      <div class="login-card">
+        <label class="login-field" for="studentIdInput">
+          <span>Student ID</span>
+          <input id="studentIdInput" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter your student ID number" />
+        </label>
+
+        <button id="loginBtn" class="save-btn" type="button">Continue</button>
+        <p id="loginMessage" class="mood-message" aria-live="polite">Use your own student ID to open your account.</p>
+      </div>
+    </section>
+
     <!-- Home page: the main landing screen -->
-    <section id="homePage" class="page active">
+    <section id="homePage" class="page">
       <p class="label">MOODTRACKA</p>
 
       <h1 class="page-title">How are you feeling?</h1>
@@ -19,6 +36,11 @@
         Track your emotions, spot patterns, and<br />
         take care of yourself.
       </p>
+
+      <div class="account-banner">
+        <span id="activeStudentBadge" class="account-badge">Not logged in</span>
+        <button id="switchAccountBtn" class="entry-action-btn" type="button">Switch account</button>
+      </div>
 
       <!-- Main navigation cards on the home screen -->
       <section class="card-grid">
@@ -151,7 +173,7 @@
 
       <p class="label">ENTRIES</p>
       <h2 class="themes-title">Saved mood snapshots</h2>
-      <p class="subtitle">Your saved moods stay here, even after you close or refresh the page.</p>
+      <p class="subtitle">Your saved moods stay here for your account, even after you close or refresh the page.</p>
 
       <div class="entries-toolbar">
         <label class="select-all-toggle">
@@ -196,9 +218,21 @@
         </article>
       </div>
 
-      <div class="chart-card">
-        <h3>Mood balance</h3>
-        <div id="statsChart"></div>
+      <div class="stats-graphs">
+        <article class="chart-card">
+          <h3>Mood balance</h3>
+          <div id="statsChart" class="bar-chart"></div>
+        </article>
+
+        <article class="chart-card">
+          <h3>7-day trend</h3>
+          <div id="weeklyTrendChart" class="trend-chart"></div>
+        </article>
+
+        <article class="chart-card">
+          <h3>Check-in mix</h3>
+          <div id="moodDonutChart" class="donut-chart"></div>
+        </article>
       </div>
     </section>
 
@@ -206,7 +240,7 @@
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resetEntriesTitle">
         <p class="label">CONFIRM RESET</p>
         <h3 id="resetEntriesTitle">Delete all saved entries?</h3>
-        <p>This will permanently remove every mood snapshot from this device.</p>
+        <p>This will permanently remove every mood snapshot from this student account on this device.</p>
 
         <div class="modal-actions">
           <button id="cancelResetEntriesBtn" class="entry-action-btn" type="button">Cancel</button>
