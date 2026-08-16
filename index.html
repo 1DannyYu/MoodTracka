@@ -41,7 +41,7 @@
           <p>Log how you feel today and keep a quick note.</p>
         </button>
 
-        <button class="card blue" type="button">
+        <button class="card blue" data-target="entries" type="button">
           <div class="icon">📝</div>
           <h2>Entries</h2>
           <p>View and reflect on all your past mood logs.</p>
@@ -145,6 +145,31 @@
       </div>
     </section>
 
+    <!-- Entries page: shows the saved mood snapshots from storage. -->
+    <section id="entriesPage" class="page">
+      <button class="back-btn" data-action="home" type="button">← Back</button>
+
+      <p class="label">ENTRIES</p>
+      <h2 class="themes-title">Saved mood snapshots</h2>
+      <p class="subtitle">Your saved moods stay here, even after you close or refresh the page.</p>
+
+      <div class="entries-toolbar">
+        <label class="select-all-toggle">
+          <input id="selectAllEntries" type="checkbox" />
+          <span>Select all</span>
+        </label>
+
+        <p id="selectionCount" class="selection-count">0 selected</p>
+
+        <div class="entries-toolbar-actions">
+          <button id="deleteSelectedEntriesBtn" class="entry-action-btn danger" type="button" disabled>Delete selected</button>
+          <button id="resetEntriesBtn" class="entry-action-btn reset" type="button">Reset all entries</button>
+        </div>
+      </div>
+
+      <div id="entriesList" class="entries-list"></div>
+    </section>
+
     <!-- Stats page: shows a quick snapshot of recent mood patterns -->
     <section id="statsPage" class="page">
       <button class="back-btn" data-action="home" type="button">← Back</button>
@@ -176,6 +201,19 @@
         <div id="statsChart"></div>
       </div>
     </section>
+
+    <div id="resetEntriesModal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resetEntriesTitle">
+        <p class="label">CONFIRM RESET</p>
+        <h3 id="resetEntriesTitle">Delete all saved entries?</h3>
+        <p>This will permanently remove every mood snapshot from this device.</p>
+
+        <div class="modal-actions">
+          <button id="cancelResetEntriesBtn" class="entry-action-btn" type="button">Cancel</button>
+          <button id="confirmResetEntriesBtn" class="entry-action-btn danger" type="button">Yes, delete all</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="script.js"></script>

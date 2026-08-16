@@ -2,8 +2,9 @@
 const homePageSection = document.getElementById("homePage");
 const themesPageSection = document.getElementById("themesPage");
 const moodPageSection = document.getElementById("moodPage");
+const entriesPageSection = document.getElementById("entriesPage");
 const statsPageSection = document.getElementById("statsPage");
-const pageSections = [homePageSection, themesPageSection, moodPageSection, statsPageSection];
+const pageSections = [homePageSection, themesPageSection, moodPageSection, entriesPageSection, statsPageSection];
 
 // Show the requested page and hide the others.
 function showPage(pageName) {
@@ -16,6 +17,10 @@ function showPage(pageName) {
   if (pageName === "stats") {
     updateMoodStats();
     renderStatsChart();
+  }
+
+  if (pageName === "entries") {
+    renderMoodEntries();
   }
 }
 
@@ -38,6 +43,8 @@ homePageCards.forEach(card => {
       showPage("stats");
     } else if (card.dataset.target === "mood") {
       showPage("mood");
+    } else if (card.dataset.target === "entries") {
+      showPage("entries");
     }
   });
 });
@@ -177,7 +184,44 @@ Object.values(themeColorInputs).forEach(input => {
 
 // Keep the stats view in sync with the entries the user saves.
 function getMoodEntries() {
-  return JSON.parse(localStorage.getItem("moodEntries") || "[]");
+  // Read raw entries and normalize them so date handling is consistent.
+  const raw = JSON.parse(localStorage.getItem("moodEntries") || "[]");
+
+  const normalized = raw.map(entry => {
+    const e = Object.assign({}, entry);
+
+    // Ensure there is a mood string
+    if (!e.mood) e.mood = "unknown";
+
+    // Normalize to `date` in YYYY-MM-DD format.
+    let dateStr = null;
+    if (e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
+      dateStr = e.date;
+    } else if (e.time) {
+      const parsed = new Date(e.time);
+      if (!Number.isNaN(parsed.getTime())) {
+        dateStr = parsed.toISOString().slice(0, 10);
+      } else {
+        const m = String(e.time).match(/(\d{4}-\d{2}-\d{2})/);
+        if (m) dateStr = m[1];
+      }
+    }
+
+    // If we still don't have a date, fall back to today.
+    if (!dateStr) dateStr = new Date().toISOString().slice(0, 10);
+
+    e.date = dateStr;
+    return e;
+  });
+
+  // Persist cleaned entries back to storage so future reads are simpler.
+  try {
+    localStorage.setItem("moodEntries", JSON.stringify(normalized));
+  } catch (err) {
+    // If storage fails, ignore — we still return normalized data for this session.
+  }
+
+  return normalized;
 }
 
 function formatMoodLabel(mood) {
@@ -268,6 +312,230 @@ function renderStatsChart() {
   `).join("");
 }
 
+function renderMoodEntries() {
+  const entriesList = document.getElementById("entriesList");
+  if (!entriesList) return;
+
+  const entries = getMoodEntries()
+    .map((entry, index) => ({ entry, index }))
+    .reverse();
+
+  if (!entries.length) {
+    entriesList.innerHTML = `
+      <div class="empty-state">
+        <h3>No saved snapshots yet</h3>
+        <p>Save a mood entry and it will appear here automatically.</p>
+      </div>
+    `;
+    return;
+  }
+
+  entriesList.innerHTML = entries.map(({ entry, index }) => `
+    <article class="entry-card${selectedEntryIndices.has(index) ? " selected" : ""}">
+      <label class="entry-select">
+        <input type="checkbox" data-action="toggle-entry-select" data-entry-index="${index}" ${selectedEntryIndices.has(index) ? "checked" : ""} />
+        <span class="entry-select-box"></span>
+      </label>
+      <div class="entry-copy">
+        <h3>${formatMoodLabel(entry.mood)}</h3>
+        <p>${entry.note || "No note added"}</p>
+      </div>
+      <div class="entry-meta">
+        <span>${entry.date}</span>
+        <div class="entry-actions">
+          <button class="entry-action-btn" data-action="edit-entry" data-entry-index="${index}" type="button">Edit</button>
+          <button class="entry-action-btn danger" data-action="delete-entry" data-entry-index="${index}" type="button">Delete</button>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
+  syncEntryBulkControls();
+}
+
+function saveMoodEntries(entries) {
+  localStorage.setItem("moodEntries", JSON.stringify(entries));
+}
+
+const allowedMoods = ["calm", "happy", "tired", "stressed"];
+const selectedEntryIndices = new Set();
+
+const entriesList = document.getElementById("entriesList");
+const selectAllEntriesCheckbox = document.getElementById("selectAllEntries");
+const selectionCount = document.getElementById("selectionCount");
+const deleteSelectedEntriesButton = document.getElementById("deleteSelectedEntriesBtn");
+const resetEntriesButton = document.getElementById("resetEntriesBtn");
+const resetEntriesModal = document.getElementById("resetEntriesModal");
+const cancelResetEntriesButton = document.getElementById("cancelResetEntriesBtn");
+const confirmResetEntriesButton = document.getElementById("confirmResetEntriesBtn");
+
+function syncEntryBulkControls() {
+  const totalEntries = getMoodEntries().length;
+  const selectedCount = selectedEntryIndices.size;
+
+  if (selectionCount) {
+    selectionCount.textContent = `${selectedCount} selected`;
+  }
+
+  if (deleteSelectedEntriesButton) {
+    deleteSelectedEntriesButton.disabled = selectedCount === 0;
+  }
+
+  if (selectAllEntriesCheckbox) {
+    selectAllEntriesCheckbox.checked = totalEntries > 0 && selectedCount === totalEntries;
+    selectAllEntriesCheckbox.indeterminate = selectedCount > 0 && selectedCount < totalEntries;
+  }
+}
+
+function clearSelectedEntries() {
+  selectedEntryIndices.clear();
+  syncEntryBulkControls();
+}
+
+function deleteEntriesByIndices(entryIndices) {
+  if (!entryIndices.length) return;
+
+  const entries = getMoodEntries();
+  const uniqueIndices = [...new Set(entryIndices)].filter(index => Number.isInteger(index));
+
+  uniqueIndices.sort((a, b) => b - a).forEach(index => {
+    entries.splice(index, 1);
+  });
+
+  saveMoodEntries(entries);
+  clearSelectedEntries();
+  updateMoodStats();
+  renderStatsChart();
+  renderMoodEntries();
+}
+
+function editMoodEntry(entryIndex) {
+  const entries = getMoodEntries();
+  const currentEntry = entries[entryIndex];
+
+  if (!currentEntry) return;
+
+  const moodInput = prompt("Edit mood: calm, happy, tired, stressed", currentEntry.mood || "calm");
+  if (moodInput === null) return;
+
+  const noteInput = prompt("Edit note:", currentEntry.note || "No note added");
+  if (noteInput === null) return;
+
+  entries[entryIndex] = {
+    ...currentEntry,
+    mood: allowedMoods.includes(moodInput.trim().toLowerCase()) ? moodInput.trim().toLowerCase() : currentEntry.mood,
+    note: noteInput.trim() || "No note added"
+  };
+
+  saveMoodEntries(entries);
+  updateMoodStats();
+  renderStatsChart();
+  renderMoodEntries();
+}
+
+function deleteMoodEntry(entryIndex) {
+  const entries = getMoodEntries();
+  const currentEntry = entries[entryIndex];
+
+  if (!currentEntry) return;
+
+  const confirmed = confirm(`Delete the ${formatMoodLabel(currentEntry.mood)} entry from ${currentEntry.date}?`);
+  if (!confirmed) return;
+
+  deleteEntriesByIndices([entryIndex]);
+}
+
+if (entriesList) {
+  entriesList.addEventListener("click", event => {
+    const button = event.target.closest("button[data-action]");
+    const checkbox = event.target.closest("input[data-action='toggle-entry-select']");
+
+    if (checkbox) {
+      const entryIndex = Number(checkbox.dataset.entryIndex);
+
+      if (checkbox.checked) {
+        selectedEntryIndices.add(entryIndex);
+      } else {
+        selectedEntryIndices.delete(entryIndex);
+      }
+
+      syncEntryBulkControls();
+      renderMoodEntries();
+      return;
+    }
+
+    if (!button) return;
+
+    const entryIndex = Number(button.dataset.entryIndex);
+
+    if (button.dataset.action === "edit-entry") {
+      editMoodEntry(entryIndex);
+    }
+
+    if (button.dataset.action === "delete-entry") {
+      deleteMoodEntry(entryIndex);
+    }
+  });
+}
+
+if (selectAllEntriesCheckbox) {
+  selectAllEntriesCheckbox.addEventListener("change", () => {
+    selectedEntryIndices.clear();
+
+    if (selectAllEntriesCheckbox.checked) {
+      getMoodEntries().forEach((_, index) => selectedEntryIndices.add(index));
+    }
+
+    syncEntryBulkControls();
+    renderMoodEntries();
+  });
+}
+
+if (deleteSelectedEntriesButton) {
+  deleteSelectedEntriesButton.addEventListener("click", () => {
+    deleteEntriesByIndices([...selectedEntryIndices]);
+  });
+}
+
+function openResetEntriesModal() {
+  if (!resetEntriesModal) return;
+  resetEntriesModal.classList.add("visible");
+  resetEntriesModal.setAttribute("aria-hidden", "false");
+}
+
+function closeResetEntriesModal() {
+  if (!resetEntriesModal) return;
+  resetEntriesModal.classList.remove("visible");
+  resetEntriesModal.setAttribute("aria-hidden", "true");
+}
+
+if (resetEntriesButton) {
+  resetEntriesButton.addEventListener("click", openResetEntriesModal);
+}
+
+if (cancelResetEntriesButton) {
+  cancelResetEntriesButton.addEventListener("click", closeResetEntriesModal);
+}
+
+if (confirmResetEntriesButton) {
+  confirmResetEntriesButton.addEventListener("click", () => {
+    saveMoodEntries([]);
+    clearSelectedEntries();
+    closeResetEntriesModal();
+    updateMoodStats();
+    renderStatsChart();
+    renderMoodEntries();
+  });
+}
+
+if (resetEntriesModal) {
+  resetEntriesModal.addEventListener("click", event => {
+    if (event.target === resetEntriesModal) {
+      closeResetEntriesModal();
+    }
+  });
+}
+
 // Simple mood entry form for the new tracking page.
 const moodButtons = document.querySelectorAll(".mood-btn");
 const moodNoteInput = document.getElementById("moodNote");
@@ -290,13 +558,14 @@ if (saveMoodButton) {
       note: moodNoteInput?.value.trim() || "No note added",
       date: new Date().toLocaleDateString("en-CA")
     });
-    localStorage.setItem("moodEntries", JSON.stringify(entries));
+    saveMoodEntries(entries);
 
     if (moodNoteInput) moodNoteInput.value = "";
     if (moodMessage) moodMessage.textContent = `Saved ${selectedMood} entry.`;
 
     updateMoodStats();
     renderStatsChart();
+    renderMoodEntries();
   });
 }
 
@@ -304,3 +573,4 @@ if (saveMoodButton) {
 applyTheme(themePresets["night-sky"]);
 updateMoodStats();
 renderStatsChart();
+renderMoodEntries();
