@@ -9,6 +9,7 @@ const pageSections = [loginPageSection, homePageSection, themesPageSection, mood
 
 const storagePrefix = "MoodTracka";
 const activeStudentStorageKey = `${storagePrefix}:activeStudentId`;
+const themeAutoModeStorageSuffix = "themeAuto";
 const accountBadge = document.getElementById("activeStudentBadge");
 const switchAccountButton = document.getElementById("switchAccountBtn");
 const studentIdInput = document.getElementById("studentIdInput");
@@ -30,6 +31,10 @@ function getStudentStorageKey(studentId, suffix) {
 function getCurrentStudentStorageKey(suffix) {
   const studentId = getActiveStudentId();
   return studentId ? getStudentStorageKey(studentId, suffix) : null;
+}
+
+function getThemeAutoStorageKey() {
+  return getCurrentStudentStorageKey(themeAutoModeStorageSuffix);
 }
 
 function updateActiveStudentBadge() {
@@ -68,6 +73,8 @@ function logoutStudent() {
   clearAccountState();
   refreshStatsVisuals();
   renderMoodEntries();
+  applyTheme(themePresets["night-sky"], false);
+  resetMoodForm();
   showPage("login");
 }
 
@@ -87,8 +94,9 @@ function openStudentSession(studentId) {
     loginMessage.textContent = `Logged in as ${getActiveStudentId()}.`;
   }
 
-  const savedTheme = loadThemeForActiveStudent();
-  applyTheme(savedTheme, false);
+  moodThemeAutoEnabled = loadMoodThemeAutoEnabled();
+  updateMoodThemeModeUI();
+  applyStudentTheme(false);
   resetMoodForm();
   showPage("home");
   return true;
@@ -121,6 +129,31 @@ function saveThemeForActiveStudent(themeValues) {
   }
 
   localStorage.setItem(storageKey, JSON.stringify(themeValues));
+}
+
+function loadMoodThemeAutoEnabled() {
+  const storageKey = getThemeAutoStorageKey();
+
+  if (!storageKey) {
+    return true;
+  }
+
+  try {
+    const storedValue = localStorage.getItem(storageKey);
+    return storedValue === null ? true : JSON.parse(storedValue) !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
+function saveMoodThemeAutoEnabled(isEnabled) {
+  const storageKey = getThemeAutoStorageKey();
+
+  if (!storageKey) {
+    return;
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify(Boolean(isEnabled)));
 }
 
 // Show the requested page and hide the others.
@@ -189,6 +222,8 @@ const themeColorInputs = {
   textColor: document.getElementById("textColor"),
   mutedColor: document.getElementById("mutedColor")
 };
+const moodThemeToggle = document.getElementById("moodThemeToggle");
+const themeModeMessage = document.getElementById("themeModeMessage");
 
 const themePresets = {
   "calm-dawn": {
@@ -241,6 +276,133 @@ const themePresets = {
   }
 };
 
+const moodThemePalettes = {
+  calm: {
+    bg: "#08111a",
+    surface: "#102433",
+    surfaceStrong: "#17364b",
+    text: "#edf7fb",
+    muted: "#8ab0c2",
+    accent: "#5dc7c7",
+    accent2: "#62a9ff",
+    border: "#2f6d7f",
+    glow: "#4edbd3",
+    glowSoft: "#9cefe8"
+  },
+  happy: {
+    bg: "#fff5df",
+    surface: "#ffe7b8",
+    surfaceStrong: "#ffd26f",
+    text: "#5a3412",
+    muted: "#a56a1f",
+    accent: "#ffb703",
+    accent2: "#ff7b54",
+    border: "#d98e1f",
+    glow: "#ffbf47",
+    glowSoft: "#ffe0a3"
+  },
+  angry: {
+    bg: "#1a0708",
+    surface: "#361014",
+    surfaceStrong: "#641b22",
+    text: "#fff0f1",
+    muted: "#d98a92",
+    accent: "#e63946",
+    accent2: "#ff7b6b",
+    border: "#9e2a35",
+    glow: "#ff4d5a",
+    glowSoft: "#ffb0b8"
+  },
+  tired: {
+    bg: "#0d1020",
+    surface: "#191f38",
+    surfaceStrong: "#2d3557",
+    text: "#e9ecff",
+    muted: "#96a0c7",
+    accent: "#8b8cff",
+    accent2: "#6dd3ff",
+    border: "#4d5a91",
+    glow: "#9ba3ff",
+    glowSoft: "#c0c7ff"
+  },
+  stressed: {
+    bg: "#13070b",
+    surface: "#2a1118",
+    surfaceStrong: "#4f1a25",
+    text: "#ffeef2",
+    muted: "#cb8f9d",
+    accent: "#ff6d8c",
+    accent2: "#c86bff",
+    border: "#7d3144",
+    glow: "#ff7a96",
+    glowSoft: "#ffbbcb"
+  },
+  unknown: {
+    bg: "#080b1f",
+    surface: "#151b39",
+    surfaceStrong: "#24315c",
+    text: "#ecf2ff",
+    muted: "#7f8eb2",
+    accent: "#7c8cff",
+    accent2: "#4dc5ff",
+    border: "#4d5ea8",
+    glow: "#8e7cff",
+    glowSoft: "#9bdcff"
+  }
+};
+
+let moodThemeAutoEnabled = true;
+
+function getThemeForMood(mood) {
+  return moodThemePalettes[mood] || moodThemePalettes.unknown;
+}
+
+function getLatestMoodTheme() {
+  const latestEntry = getMoodEntries().at(-1);
+  return getThemeForMood(latestEntry?.mood || "unknown");
+}
+
+function updateMoodThemeModeUI() {
+  if (moodThemeToggle) {
+    moodThemeToggle.checked = moodThemeAutoEnabled;
+  }
+
+  presetThemeButtons.forEach(button => {
+    button.disabled = moodThemeAutoEnabled;
+  });
+
+  Object.values(themeColorInputs).forEach(input => {
+    input.disabled = moodThemeAutoEnabled;
+  });
+
+  if (themeModeMessage) {
+    themeModeMessage.textContent = moodThemeAutoEnabled
+      ? "Mood themes are on."
+      : "Mood themes are off. Night sky stays as the default theme.";
+  }
+}
+
+function applyStudentTheme(shouldPersist = true) {
+  if (moodThemeAutoEnabled) {
+    applyTheme(getLatestMoodTheme(), false);
+    return;
+  }
+
+  applyTheme(loadThemeForActiveStudent(), shouldPersist);
+}
+
+function setMoodThemeAutoEnabled(isEnabled) {
+  moodThemeAutoEnabled = Boolean(isEnabled);
+  saveMoodThemeAutoEnabled(moodThemeAutoEnabled);
+  updateMoodThemeModeUI();
+
+  if (moodThemeAutoEnabled) {
+    applyTheme(getLatestMoodTheme(), false);
+  } else {
+    applyTheme(loadThemeForActiveStudent(), false);
+  }
+}
+
 // Apply the selected theme by updating CSS custom properties.
 function applyTheme(themeValues, shouldPersist = true) {
   const resolvedTheme = {
@@ -285,6 +447,10 @@ function applyTheme(themeValues, shouldPersist = true) {
 // Switch to a preset theme when a preset card is clicked.
 presetThemeButtons.forEach(button => {
   button.addEventListener("click", () => {
+    if (moodThemeAutoEnabled) {
+      return;
+    }
+
     const selectedTheme = themePresets[button.dataset.theme];
     if (selectedTheme) {
       applyTheme(selectedTheme);
@@ -295,6 +461,10 @@ presetThemeButtons.forEach(button => {
 // Update the preview as the user changes any custom colour.
 Object.values(themeColorInputs).forEach(input => {
   input.addEventListener("input", () => {
+    if (moodThemeAutoEnabled) {
+      return;
+    }
+
     applyTheme({
       bg: themeColorInputs.bgColor.value,
       surface: themeColorInputs.surfaceColor.value,
@@ -318,8 +488,17 @@ function getMoodEntries() {
     return [];
   }
 
-  // Read raw entries and normalize them so date handling is consistent.
-  const raw = JSON.parse(localStorage.getItem(storageKey) || "[]");
+  let raw = [];
+  try {
+    const storedValue = localStorage.getItem(storageKey);
+    raw = storedValue ? JSON.parse(storedValue) : [];
+  } catch (error) {
+    raw = [];
+  }
+
+  if (!Array.isArray(raw)) {
+    raw = [];
+  }
 
   const normalized = raw.map(entry => {
     const e = Object.assign({}, entry);
@@ -389,12 +568,12 @@ function getStreak(entries) {
   const sortedDates = [...new Set(validDates)].sort();
   let streak = 1;
 
-  for (let i = 1; i < sortedDates.length; i += 1) {
-    const [prevYear, prevMonth, prevDay] = sortedDates[i - 1].split("-").map(Number);
+  for (let i = sortedDates.length - 1; i > 0; i -= 1) {
     const [currYear, currMonth, currDay] = sortedDates[i].split("-").map(Number);
-    const previousDate = Date.UTC(prevYear, prevMonth - 1, prevDay);
+    const [prevYear, prevMonth, prevDay] = sortedDates[i - 1].split("-").map(Number);
     const currentDate = Date.UTC(currYear, currMonth - 1, currDay);
-    const dayDiff = (previousDate - currentDate) / (1000 * 60 * 60 * 24);
+    const previousDate = Date.UTC(prevYear, prevMonth - 1, prevDay);
+    const dayDiff = (currentDate - previousDate) / (1000 * 60 * 60 * 24);
 
     if (dayDiff === 1) {
       streak += 1;
@@ -418,22 +597,24 @@ function updateMoodStats() {
 }
 
 const moodColorMap = {
-  calm: "var(--accent)",
-  happy: "var(--accent-2)",
-  tired: "var(--glow)",
-  stressed: "var(--muted)"
+  calm: "#5dc7c7",
+  happy: "#ffb703",
+  angry: "#e63946",
+  tired: "#8b8cff",
+  stressed: "#ff6d8c"
 };
 
 const moodScoreMap = {
   calm: 4,
   happy: 5,
+  angry: 1,
   tired: 2,
   stressed: 1,
   unknown: 2
 };
 
 function getMoodTotals(entries) {
-  const totals = { calm: 0, happy: 0, tired: 0, stressed: 0 };
+  const totals = { calm: 0, happy: 0, angry: 0, tired: 0, stressed: 0 };
 
   entries.forEach(entry => {
     if (totals[entry.mood] !== undefined) {
@@ -461,6 +642,7 @@ function renderStatsChart() {
   const chartData = [
     { label: "Calm", value: summary.calm || 0, color: moodColorMap.calm },
     { label: "Happy", value: summary.happy || 0, color: moodColorMap.happy },
+    { label: "Angry", value: summary.angry || 0, color: moodColorMap.angry },
     { label: "Tired", value: summary.tired || 0, color: moodColorMap.tired },
     { label: "Stressed", value: summary.stressed || 0, color: moodColorMap.stressed }
   ];
@@ -485,111 +667,82 @@ function renderWeeklyTrendChart() {
   const entries = getMoodEntries();
 
   if (!entries.length) {
-    chart.innerHTML = '<div class="chart-empty">Log a few moods to unlock the weekly trend.</div>';
+    chart.innerHTML = '<div class="chart-empty">Log a few moods to unlock the 10 most recent entries pie chart.</div>';
     return;
   }
 
-  const newestDate = entries
-    .map(entry => entry.date)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b) - new Date(a))[0];
+  const recentEntries = entries.slice(-10);
 
-  const endDate = newestDate ? new Date(`${newestDate}T12:00:00`) : new Date();
-  const dates = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(endDate);
-    date.setDate(endDate.getDate() - (6 - index));
-    date.setHours(0, 0, 0, 0);
-    return date.toISOString().slice(0, 10);
-  });
+  const width = 180;
+  const height = 180;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = 72;
 
-  const trend = dates.map(date => {
-    const dayEntries = entries.filter(entry => entry.date === date);
-    const average = dayEntries.length
-      ? dayEntries.reduce((sum, entry) => sum + (moodScoreMap[entry.mood] || moodScoreMap.unknown), 0) / dayEntries.length
-      : 0;
-
-    const dominantMood = dayEntries.length
-      ? Object.entries(dayEntries.reduce((acc, entry) => {
-          acc[entry.mood] = (acc[entry.mood] || 0) + 1;
-          return acc;
-        }, {})).sort((a, b) => b[1] - a[1])[0][0]
-      : "no-entry";
-
+  function polarToCartesian(angleInDegrees) {
+    const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180);
     return {
-      date,
-      label: new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" }),
-      value: average,
-      moodLabel: dayEntries.length ? formatMoodLabel(dominantMood) : "No entry",
-      hasEntry: dayEntries.length > 0
+      x: centerX + radius * Math.cos(angleInRadians),
+      y: centerY + radius * Math.sin(angleInRadians)
     };
-  });
-
-  const values = trend.map(day => day.value).filter(value => value > 0);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 5);
-  const width = 280;
-  const height = 150;
-  const padding = 18;
-  const usableWidth = width - padding * 2;
-  const usableHeight = height - padding * 2;
-  const baselineY = height - padding;
-
-  const entryIndexes = trend
-    .map((day, index) => (day.hasEntry ? index : null))
-    .filter(index => index !== null);
-
-  function getYForDay(index, dayValue = 0) {
-    const previousIndex = [...entryIndexes].reverse().find(entryIndex => entryIndex < index);
-    const nextIndex = entryIndexes.find(entryIndex => entryIndex > index);
-    const referenceValue = dayValue || (previousIndex !== undefined ? trend[previousIndex].value : nextIndex !== undefined ? trend[nextIndex].value : 0);
-
-    return baselineY - ((referenceValue - min) / (max - min || 1)) * usableHeight;
   }
 
-  const points = trend.map((day, index) => {
-    const x = padding + (trend.length === 1 ? usableWidth / 2 : (usableWidth / (trend.length - 1)) * index);
-    const y = day.hasEntry ? getYForDay(index, day.value) : getYForDay(index);
-    return { ...day, x, y };
-  });
+  function describePieSlice(startAngle, endAngle) {
+    const start = polarToCartesian(endAngle);
+    const end = polarToCartesian(startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
 
-  const averageMoodScore = values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : 0;
-  const lineColor = averageMoodScore >= 4 ? "var(--accent)" : averageMoodScore >= 3 ? "var(--accent-2)" : averageMoodScore >= 2 ? "var(--glow)" : "var(--muted)";
+    return [
+      `M ${centerX} ${centerY}`,
+      `L ${start.x} ${start.y}`,
+      `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+      "Z"
+    ].join(" ");
+  }
 
-  const linePath = points.map((point, index) => {
-    const command = index === 0 ? "M" : "L";
-    return `${command} ${point.x} ${point.y}`;
-  }).join(" ");
+  const segmentSize = 360 / recentEntries.length;
+  let currentAngle = 0;
 
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`;
+  const pieSegments = recentEntries.map((entry, index) => {
+    const mood = entry.mood || "unknown";
+    const moodColor = moodColorMap[mood] || moodColorMap.unknown || "var(--muted)";
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + segmentSize;
+    currentAngle = endAngle;
 
-  const pointMarkup = points.filter(point => point.hasEntry).map(point => {
-    const shortLabel = point.moodLabel.charAt(0);
     return `
-      <g>
-        <circle cx="${point.x}" cy="${point.y}" r="4" class="trend-point" />
-        <text x="${point.x}" y="${point.y - 11}" text-anchor="middle" class="trend-label">${shortLabel}</text>
-      </g>
+      <path
+        d="${describePieSlice(startAngle, endAngle)}"
+        class="pie-slice"
+        style="fill:${moodColor};"
+      />
     `;
   }).join("");
 
-  const legendMarkup = Object.entries(moodColorMap).map(([mood, color]) => `
-    <span class="trend-legend-item">
-      <span class="trend-legend-swatch" style="background:${color};"></span>
-      ${formatMoodLabel(mood)}
-    </span>
-  `).join("");
+  const legendMarkup = recentEntries.slice().reverse().map((entry, index) => {
+    const mood = entry.mood || "unknown";
+    const moodColor = moodColorMap[mood] || moodColorMap.unknown || "var(--muted)";
+    const label = `${formatMoodLabel(mood)} · ${entry.date || "No date"}`;
+    return `
+      <div class="pie-legend-item">
+        <span class="pie-legend-swatch" style="background:${moodColor};"></span>
+        <span>${label}</span>
+      </div>
+    `;
+  }).join("");
 
   chart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="7-day mood trend">
-      <path d="${areaPath}" class="trend-area" />
-      <path d="${linePath}" class="trend-line" style="stroke:${lineColor};" />
-      ${pointMarkup}
-    </svg>
-    <div class="trend-legend">${legendMarkup}</div>
-    <div class="trend-labels">
-      ${trend.map(day => `<span>${day.label}</span>`).join("")}
+    <div class="pie-visual">
+      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-label="10 most recent entries pie chart">
+        ${pieSegments}
+      </svg>
+      <div class="pie-center">
+        <strong>${recentEntries.length}</strong>
+        <span>entries</span>
+      </div>
+    </div>
+    <div class="pie-legend">
+      ${legendMarkup}
     </div>
   `;
 }
@@ -713,9 +866,13 @@ function saveMoodEntries(entries) {
   }
 
   localStorage.setItem(storageKey, JSON.stringify(entries));
+
+  if (moodThemeAutoEnabled) {
+    applyStudentTheme(false);
+  }
 }
 
-const allowedMoods = ["calm", "happy", "tired", "stressed"];
+const allowedMoods = ["calm", "happy", "angry", "tired", "stressed"];
 const selectedEntryIndices = new Set();
 
 const entriesList = document.getElementById("entriesList");
@@ -772,7 +929,7 @@ function editMoodEntry(entryIndex) {
 
   if (!currentEntry) return;
 
-  const moodInput = prompt("Edit mood: calm, happy, tired, stressed", currentEntry.mood || "calm");
+  const moodInput = prompt("Edit mood: calm, happy, angry, tired, stressed", currentEntry.mood || "calm");
   if (moodInput === null) return;
 
   const noteInput = prompt("Edit note:", currentEntry.note || "No note added");
@@ -920,6 +1077,12 @@ moodButtons.forEach(button => {
   });
 });
 
+if (moodThemeToggle) {
+  moodThemeToggle.addEventListener("change", () => {
+    setMoodThemeAutoEnabled(moodThemeToggle.checked);
+  });
+}
+
 if (studentIdInput) {
   studentIdInput.addEventListener("keydown", event => {
     if (event.key === "Enter") {
@@ -979,6 +1142,8 @@ if (getActiveStudentId()) {
 } else {
   applyTheme(themePresets["night-sky"], false);
   resetMoodForm();
+  moodThemeAutoEnabled = true;
+  updateMoodThemeModeUI();
   refreshStatsVisuals();
   showPage("login");
 }

@@ -81,6 +81,20 @@
       <h2 class="themes-title">Choose a calming look</h2>
       <p class="subtitle">Pick a gentle palette or create your own for a more personal space.</p>
 
+      <div class="theme-mode-card">
+        <div>
+          <h3>Mood-based theme</h3>
+          <p>The app can switch the theme automatically based on the mood you log. It starts on by default.</p>
+        </div>
+
+        <label class="theme-toggle">
+          <input id="moodThemeToggle" type="checkbox" checked />
+          <span>Turn on automatic mood themes</span>
+        </label>
+
+        <p id="themeModeMessage" class="theme-mode-message">Mood themes are on.</p>
+      </div>
+
       <!-- Theme preset choices -->
       <div class="preset-grid">
         <button class="preset-card" data-theme="calm-dawn" type="button">
@@ -153,6 +167,7 @@
         <div class="mood-options">
           <button class="mood-btn active" data-mood="calm" type="button">😌 Calm</button>
           <button class="mood-btn" data-mood="happy" type="button">😊 Happy</button>
+          <button class="mood-btn" data-mood="angry" type="button">😠 Angry</button>
           <button class="mood-btn" data-mood="tired" type="button">😴 Tired</button>
           <button class="mood-btn" data-mood="stressed" type="button">😵 Stressed</button>
         </div>
@@ -225,7 +240,7 @@
         </article>
 
         <article class="chart-card">
-          <h3>7-day trend</h3>
+          <h3>10 most recent entries pie chart</h3>
           <div id="weeklyTrendChart" class="trend-chart"></div>
         </article>
 
