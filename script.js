@@ -661,17 +661,39 @@ function renderStatsChart() {
 }
 
 function renderWeeklyTrendChart() {
+  const title = document.getElementById("weeklyTrendTitle");
   const chart = document.getElementById("weeklyTrendChart");
   if (!chart) return;
 
   const entries = getMoodEntries();
 
   if (!entries.length) {
+    if (title) {
+      title.textContent = "Recent entries";
+    }
     chart.innerHTML = '<div class="chart-empty">Log a few moods to unlock the 10 most recent entries pie chart.</div>';
     return;
   }
 
   const recentEntries = entries.slice(-10);
+  const moodOrder = [...allowedMoods, "unknown"];
+  const groupedRecentEntries = recentEntries
+    .map((entry, index) => ({ entry, index }))
+    .sort((left, right) => {
+      const leftRank = moodOrder.indexOf(left.entry.mood || "unknown");
+      const rightRank = moodOrder.indexOf(right.entry.mood || "unknown");
+
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return left.index - right.index;
+    })
+    .map(item => item.entry);
+
+  if (title) {
+    title.textContent = "Recent entries";
+  }
 
   const width = 180;
   const height = 180;
@@ -700,10 +722,10 @@ function renderWeeklyTrendChart() {
     ].join(" ");
   }
 
-  const segmentSize = 360 / recentEntries.length;
+  const segmentSize = 360 / groupedRecentEntries.length;
   let currentAngle = 0;
 
-  const pieSegments = recentEntries.map((entry, index) => {
+  const pieSegments = groupedRecentEntries.map(entry => {
     const mood = entry.mood || "unknown";
     const moodColor = moodColorMap[mood] || moodColorMap.unknown || "var(--muted)";
     const startAngle = currentAngle;
@@ -719,7 +741,7 @@ function renderWeeklyTrendChart() {
     `;
   }).join("");
 
-  const legendMarkup = recentEntries.slice().reverse().map((entry, index) => {
+  const legendMarkup = groupedRecentEntries.slice().reverse().map((entry, index) => {
     const mood = entry.mood || "unknown";
     const moodColor = moodColorMap[mood] || moodColorMap.unknown || "var(--muted)";
     const label = `${formatMoodLabel(mood)} · ${entry.date || "No date"}`;
