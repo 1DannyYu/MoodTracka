@@ -21,8 +21,13 @@
           <input id="studentIdInput" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter your student ID number" />
         </label>
 
+        <label class="login-field" for="studentNameInput">
+          <span>Student Name</span>
+          <input id="studentNameInput" type="text" autocomplete="name" placeholder="Enter your name (e.g. Alex Smith)" />
+        </label>
+
         <button id="loginBtn" class="save-btn" type="button">Continue</button>
-        <p id="loginMessage" class="mood-message" aria-live="polite">Use your own student ID to open your account.</p>
+        <p id="loginMessage" class="mood-message" aria-live="polite">Use your own student ID and name to open your account.</p>
       </div>
     </section>
 
@@ -67,6 +72,13 @@
           <div class="icon">📝</div>
           <h2>Entries</h2>
           <p>View and reflect on all your past mood logs.</p>
+        </button>
+
+        <!-- Admin card: only visible when student ID 6767 is logged in -->
+        <button id="adminCard" class="card gold admin-card" data-target="admin" type="button" style="display: none;">
+          <div class="icon">🔒</div>
+          <h2>Admin Records</h2>
+          <p>Confidential view of all student details, mood history, and data file.</p>
         </button>
       </section>
 
@@ -249,6 +261,29 @@
           <div id="moodDonutChart" class="donut-chart"></div>
         </article>
       </div>
+    </section>
+
+    <!-- Admin page: confidential student records viewer for admin ID 6767 only -->
+    <section id="adminPage" class="page">
+      <button class="back-btn" data-action="home" type="button">← Back</button>
+
+      <p class="label">ADMINISTRATOR ACCESS (ID: 6767)</p>
+      <h2 class="themes-title">Confidential Student Directory</h2>
+      <p class="subtitle">Full access to all registered student details, mood logs, and data exports.</p>
+
+      <div class="admin-toolbar">
+        <input id="adminSearchInput" class="admin-search-input" type="text" placeholder="Search by student name or ID..." />
+        <div class="admin-actions">
+          <button id="adminDownloadTxtBtn" class="entry-action-btn" type="button">📄 Download student_details.txt</button>
+          <button id="adminToggleRawViewBtn" class="entry-action-btn" type="button">Toggle Text View</button>
+        </div>
+      </div>
+
+      <div id="adminRawTextView" class="admin-raw-box" style="display: none;">
+        <pre id="adminRawTextContent"></pre>
+      </div>
+
+      <div id="adminStudentList" class="admin-student-list"></div>
     </section>
 
     <div id="resetEntriesModal" class="modal-overlay" aria-hidden="true">

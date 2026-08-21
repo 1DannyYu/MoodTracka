@@ -1,23 +1,43 @@
-// Get the page sections so the app can switch between them.
 const loginPageSection = document.getElementById("loginPage");
 const homePageSection = document.getElementById("homePage");
 const themesPageSection = document.getElementById("themesPage");
 const moodPageSection = document.getElementById("moodPage");
 const entriesPageSection = document.getElementById("entriesPage");
 const statsPageSection = document.getElementById("statsPage");
-const pageSections = [loginPageSection, homePageSection, themesPageSection, moodPageSection, entriesPageSection, statsPageSection];
+const adminPageSection = document.getElementById("adminPage");
+const pageSections = [loginPageSection, homePageSection, themesPageSection, moodPageSection, entriesPageSection, statsPageSection, adminPageSection];
 
 const storagePrefix = "MoodTracka";
 const activeStudentStorageKey = `${storagePrefix}:activeStudentId`;
+const studentsRegistryStorageKey = `${storagePrefix}:registeredStudents`;
 const themeAutoModeStorageSuffix = "themeAuto";
+const ADMIN_STUDENT_ID = "6767";
+
 const accountBadge = document.getElementById("activeStudentBadge");
 const switchAccountButton = document.getElementById("switchAccountBtn");
 const studentIdInput = document.getElementById("studentIdInput");
+const studentNameInput = document.getElementById("studentNameInput");
 const loginButton = document.getElementById("loginBtn");
 const loginMessage = document.getElementById("loginMessage");
 
+const adminCard = document.getElementById("adminCard");
+const adminSearchInput = document.getElementById("adminSearchInput");
+const adminDownloadTxtBtn = document.getElementById("adminDownloadTxtBtn");
+const adminToggleRawViewBtn = document.getElementById("adminToggleRawViewBtn");
+const adminRawTextView = document.getElementById("adminRawTextView");
+const adminRawTextContent = document.getElementById("adminRawTextContent");
+const adminStudentList = document.getElementById("adminStudentList");
+
+function isAdmin() {
+  return getActiveStudentId() === ADMIN_STUDENT_ID;
+}
+
 function normalizeStudentId(value) {
   return String(value || "").replace(/\s+/g, "").trim();
+}
+
+function normalizeStudentName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
 }
 
 function getActiveStudentId() {
@@ -37,11 +57,147 @@ function getThemeAutoStorageKey() {
   return getCurrentStudentStorageKey(themeAutoModeStorageSuffix);
 }
 
+function getRegisteredStudentsMap() {
+  try {
+    const raw = localStorage.getItem(studentsRegistryStorageKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveRegisteredStudentsMap(registry) {
+  try {
+    localStorage.setItem(studentsRegistryStorageKey, JSON.stringify(registry));
+  } catch (error) {
+    // Storage fallback
+  }
+}
+
+function getStudentName(studentId) {
+  const normalizedId = normalizeStudentId(studentId);
+  if (!normalizedId) return "";
+
+  // Check individual student key first
+  const individualName = localStorage.getItem(getStudentStorageKey(normalizedId, "name"));
+  if (individualName && individualName.trim()) {
+    return individualName.trim();
+  }
+
+  // Check registry
+  const registry = getRegisteredStudentsMap();
+  if (registry[normalizedId]?.name) {
+    return registry[normalizedId].name;
+  }
+
+  return "";
+}
+
+function saveStudentName(studentId, name) {
+  const normalizedId = normalizeStudentId(studentId);
+  const normalizedName = normalizeStudentName(name);
+  if (!normalizedId) return;
+
+  if (normalizedName) {
+    localStorage.setItem(getStudentStorageKey(normalizedId, "name"), normalizedName);
+  }
+
+  const registry = getRegisteredStudentsMap();
+  const existing = registry[normalizedId] || {};
+  registry[normalizedId] = {
+    ...existing,
+    id: normalizedId,
+    name: normalizedName || existing.name || "",
+    lastActive: new Date().toISOString()
+  };
+  saveRegisteredStudentsMap(registry);
+}
+
+function getAllKnownStudentIds() {
+  const idSet = new Set();
+
+  const registry = getRegisteredStudentsMap();
+  Object.keys(registry).forEach(id => {
+    const normalized = normalizeStudentId(id);
+    if (/^\d+$/.test(normalized)) {
+      idSet.add(normalized);
+    }
+  });
+
+  const activeId = getActiveStudentId();
+  if (activeId && /^\d+$/.test(activeId)) {
+    idSet.add(activeId);
+  }
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`${storagePrefix}:student:`)) {
+        const parts = key.split(":");
+        if (parts[2] && /^\d+$/.test(parts[2])) {
+          idSet.add(parts[2]);
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return Array.from(idSet).sort((a, b) => Number(a) - Number(b));
+}
+
+function getStudentEntriesById(studentId) {
+  const normalizedId = normalizeStudentId(studentId);
+  if (!normalizedId) return [];
+
+  const storageKey = getStudentStorageKey(normalizedId, "entries");
+  let raw = [];
+  try {
+    const storedValue = localStorage.getItem(storageKey);
+    raw = storedValue ? JSON.parse(storedValue) : [];
+  } catch (error) {
+    raw = [];
+  }
+
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.map(entry => {
+    const e = Object.assign({}, entry);
+    if (!e.mood) e.mood = "unknown";
+    if (!e.date) {
+      if (e.time) {
+        const parsed = new Date(e.time);
+        e.date = !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+      } else {
+        e.date = new Date().toISOString().slice(0, 10);
+      }
+    }
+    return e;
+  });
+}
+
 function updateActiveStudentBadge() {
   const studentId = getActiveStudentId();
+  const studentName = getStudentName(studentId);
 
   if (accountBadge) {
-    accountBadge.textContent = studentId ? `Logged in as ${studentId}` : "Not logged in";
+    if (!studentId) {
+      accountBadge.textContent = "Not logged in";
+    } else if (studentId === ADMIN_STUDENT_ID) {
+      accountBadge.textContent = studentName
+        ? `🛡️ Logged in as ${studentName} (Admin ID: ${studentId})`
+        : `🛡️ Logged in as Administrator (ID: ${studentId})`;
+    } else if (studentName) {
+      accountBadge.textContent = `Logged in as ${studentName} (ID: ${studentId})`;
+    } else {
+      accountBadge.textContent = `Logged in as ID: ${studentId}`;
+    }
+  }
+
+  if (adminCard) {
+    adminCard.style.display = studentId === ADMIN_STUDENT_ID ? "block" : "none";
   }
 
   if (switchAccountButton) {
@@ -71,6 +227,9 @@ function setActiveStudentId(studentId) {
 function logoutStudent() {
   localStorage.removeItem(activeStudentStorageKey);
   clearAccountState();
+  if (studentNameInput) {
+    studentNameInput.value = "";
+  }
   refreshStatsVisuals();
   renderMoodEntries();
   applyTheme(themePresets["night-sky"], false);
@@ -78,22 +237,44 @@ function logoutStudent() {
   showPage("login");
 }
 
-function openStudentSession(studentId) {
-  if (!setActiveStudentId(studentId)) {
+function openStudentSession(studentId, studentName) {
+  const trimmedId = normalizeStudentId(studentId);
+  const trimmedName = (studentName !== undefined && studentName !== null)
+    ? normalizeStudentName(studentName)
+    : normalizeStudentName(studentNameInput?.value);
+
+  if (!setActiveStudentId(trimmedId)) {
     if (loginMessage) {
       loginMessage.textContent = "Enter a valid student ID number to continue.";
     }
     return false;
   }
 
+  const activeId = getActiveStudentId();
+
+  if (trimmedName) {
+    saveStudentName(activeId, trimmedName);
+  } else {
+    // If no name supplied now, register ID if not already saved
+    saveStudentName(activeId, getStudentName(activeId));
+  }
+
+  const resolvedName = getStudentName(activeId);
+
   if (studentIdInput) {
-    studentIdInput.value = getActiveStudentId();
+    studentIdInput.value = activeId;
+  }
+  if (studentNameInput) {
+    studentNameInput.value = resolvedName;
   }
 
   if (loginMessage) {
-    loginMessage.textContent = `Logged in as ${getActiveStudentId()}.`;
+    loginMessage.textContent = resolvedName
+      ? `Logged in as ${resolvedName} (ID: ${activeId}).`
+      : `Logged in as ID: ${activeId}.`;
   }
 
+  updateActiveStudentBadge();
   moodThemeAutoEnabled = loadMoodThemeAutoEnabled();
   updateMoodThemeModeUI();
   applyStudentTheme(false);
@@ -162,10 +343,16 @@ function showPage(pageName) {
     pageName = "login";
   }
 
+  if (pageName === "admin" && !isAdmin()) {
+    pageName = "home";
+  }
+
   const targetPageId = `${pageName}Page`;
 
   pageSections.forEach(page => {
-    page.classList.toggle("active", page.id === targetPageId);
+    if (page) {
+      page.classList.toggle("active", page.id === targetPageId);
+    }
   });
 
   if (pageName === "stats") {
@@ -174,6 +361,10 @@ function showPage(pageName) {
 
   if (pageName === "entries") {
     renderMoodEntries();
+  }
+
+  if (pageName === "admin") {
+    renderAdminStudentList(adminSearchInput?.value || "");
   }
 
   if (pageName === "login") {
@@ -202,6 +393,8 @@ homePageCards.forEach(card => {
       showPage("mood");
     } else if (card.dataset.target === "entries") {
       showPage("entries");
+    } else if (card.dataset.target === "admin") {
+      showPage("admin");
     }
   });
 });
@@ -1106,16 +1299,34 @@ if (moodThemeToggle) {
 }
 
 if (studentIdInput) {
+  studentIdInput.addEventListener("input", () => {
+    const rawId = normalizeStudentId(studentIdInput.value);
+    if (/^\d+$/.test(rawId)) {
+      const savedName = getStudentName(rawId);
+      if (savedName && studentNameInput && !studentNameInput.matches(":focus")) {
+        studentNameInput.value = savedName;
+      }
+    }
+  });
+
   studentIdInput.addEventListener("keydown", event => {
     if (event.key === "Enter") {
-      openStudentSession(studentIdInput.value);
+      openStudentSession(studentIdInput.value, studentNameInput?.value);
+    }
+  });
+}
+
+if (studentNameInput) {
+  studentNameInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      openStudentSession(studentIdInput?.value, studentNameInput.value);
     }
   });
 }
 
 if (loginButton) {
   loginButton.addEventListener("click", () => {
-    openStudentSession(studentIdInput?.value || "");
+    openStudentSession(studentIdInput?.value || "", studentNameInput?.value || "");
   });
 }
 
@@ -1155,12 +1366,343 @@ if (saveMoodButton) {
   });
 }
 
+// Admin Portal: confidential student details generation and viewer functions
+function generateHumanReadableStudentDetailsTxt() {
+  const allStudentIds = getAllKnownStudentIds();
+  const now = new Date();
+  const dateFormatted = now.toLocaleString("en-AU", {
+    dateStyle: "full",
+    timeStyle: "short"
+  });
+
+  let output = "";
+  output += "================================================================================\n";
+  output += "                 MOODTRACKA — CONFIDENTIAL STUDENT RECORDS\n";
+  output += "                 ACCESS LEVEL: ADMINISTRATOR (ID: 6767)\n";
+  output += "================================================================================\n";
+  output += `Export Date:               ${dateFormatted}\n`;
+  output += `Total Registered Students: ${allStudentIds.length}\n`;
+  output += "================================================================================\n\n";
+
+  output += "--------------------------------------------------------------------------------\n";
+  output += "STUDENT SUMMARY DIRECTORY\n";
+  output += "--------------------------------------------------------------------------------\n";
+  output += "ID".padEnd(12) + "| " + "Name".padEnd(26) + "| " + "Check-ins".padEnd(11) + "| " + "Streak".padEnd(10) + "| " + "Top Mood" + "\n";
+  output += "-".repeat(12) + "+-" + "-".repeat(26) + "+-" + "-".repeat(11) + "+-" + "-".repeat(10) + "+-" + "-".repeat(16) + "\n";
+
+  if (allStudentIds.length === 0) {
+    output += "No student records found.\n";
+  } else {
+    allStudentIds.forEach(id => {
+      const name = getStudentName(id) || (id === ADMIN_STUDENT_ID ? "Administrator" : "—");
+      const entries = getStudentEntriesById(id);
+      const streak = `${getStreak(entries)} day${getStreak(entries) === 1 ? "" : "s"}`;
+      const topMood = getMostCommonMood(entries);
+      output += id.padEnd(12) + "| " + name.padEnd(26) + "| " + String(entries.length).padEnd(11) + "| " + streak.padEnd(10) + "| " + topMood + "\n";
+    });
+  }
+  output += "--------------------------------------------------------------------------------\n\n";
+
+  output += "================================================================================\n";
+  output += "DETAILED STUDENT RECORDS & MOOD ENTRIES\n";
+  output += "================================================================================\n\n";
+
+  if (allStudentIds.length === 0) {
+    output += "No detailed student entries recorded yet.\n\n";
+  } else {
+    allStudentIds.forEach((id, studentIndex) => {
+      const name = getStudentName(id) || (id === ADMIN_STUDENT_ID ? "Administrator" : "Not provided");
+      const entries = getStudentEntriesById(id);
+      const streak = `${getStreak(entries)} day${getStreak(entries) === 1 ? "" : "s"}`;
+      const topMood = getMostCommonMood(entries);
+      const totals = getMoodTotals(entries);
+      const totalEntries = entries.length;
+
+      output += `[ STUDENT RECORD #${studentIndex + 1} ]\n`;
+      output += `Student ID:       ${id}${id === ADMIN_STUDENT_ID ? " (Administrator)" : ""}\n`;
+      output += `Student Name:     ${name}\n`;
+      output += `Total Check-ins:  ${totalEntries}\n`;
+      output += `Current Streak:   ${streak}\n`;
+      output += `Most Common Mood: ${topMood}\n`;
+      output += "Mood Breakdown:\n";
+      ["calm", "happy", "tired", "stressed", "angry"].forEach(mood => {
+        const count = totals[mood] || 0;
+        const pct = totalEntries ? Math.round((count / totalEntries) * 100) : 0;
+        output += `  • ${formatMoodLabel(mood).padEnd(10)}: ${String(count).padStart(2)} entries (${String(pct).padStart(3)}%)\n`;
+      });
+      output += "\n";
+
+      if (entries.length === 0) {
+        output += "  (No mood snapshots recorded yet for this student)\n\n";
+      } else {
+        output += `  Mood Snapshots History (${entries.length} ${entries.length === 1 ? "entry" : "entries"}):\n`;
+        output += "  " + "-".repeat(76) + "\n";
+        output += "  " + "#".padEnd(4) + "| " + "Date".padEnd(12) + "| " + "Mood".padEnd(10) + "| Note\n";
+        output += "  " + "-".repeat(4) + "+-" + "-".repeat(12) + "+-" + "-".repeat(10) + "+-" + "-".repeat(44) + "\n";
+
+        entries.forEach((entry, idx) => {
+          const num = String(idx + 1).padEnd(4);
+          const date = (entry.date || "—").padEnd(12);
+          const mood = formatMoodLabel(entry.mood).padEnd(10);
+          const note = entry.note || "No note added";
+          output += `  ${num}| ${date}| ${mood}| ${note}\n`;
+        });
+        output += "  " + "-".repeat(76) + "\n\n";
+      }
+
+      output += "================================================================================\n\n";
+    });
+  }
+
+  output += "End of MoodTracka Confidential Student Records.\n";
+  return output;
+}
+
+function downloadStudentDetailsTxt() {
+  if (!isAdmin()) {
+    alert("Unauthorized: Only administrator account (ID: 6767) can download student records.");
+    return;
+  }
+  const content = generateHumanReadableStudentDetailsTxt();
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "student_details.txt";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function saveStudentEntriesById(studentId, entries) {
+  const normalizedId = normalizeStudentId(studentId);
+  if (!normalizedId) return;
+
+  const storageKey = getStudentStorageKey(normalizedId, "entries");
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(entries));
+  } catch (err) {}
+
+  if (getActiveStudentId() === normalizedId) {
+    refreshStatsVisuals();
+    renderMoodEntries();
+  }
+}
+
+function renderAdminStudentList(query = "") {
+  if (!adminStudentList) return;
+  if (!isAdmin()) {
+    adminStudentList.innerHTML = '<p class="chart-empty">Access denied. Admin credentials required.</p>';
+    return;
+  }
+
+  const allStudentIds = getAllKnownStudentIds();
+  const cleanQuery = query.toLowerCase().trim();
+
+  const filteredIds = allStudentIds.filter(id => {
+    if (!cleanQuery) return true;
+    const name = (getStudentName(id) || "").toLowerCase();
+    return id.includes(cleanQuery) || name.includes(cleanQuery);
+  });
+
+  if (!filteredIds.length) {
+    adminStudentList.innerHTML = `
+      <div class="empty-state">
+        <h3>No student records matching "${query}"</h3>
+        <p>Try searching for a different name or ID.</p>
+      </div>
+    `;
+    return;
+  }
+
+  adminStudentList.innerHTML = filteredIds.map(id => {
+    const name = getStudentName(id) || (id === ADMIN_STUDENT_ID ? "Administrator" : "Name not provided");
+    const entries = getStudentEntriesById(id);
+    const streak = `${getStreak(entries)} day${getStreak(entries) === 1 ? "" : "s"}`;
+    const topMood = getMostCommonMood(entries);
+    const totals = getMoodTotals(entries);
+
+    const moodBadges = ["calm", "happy", "tired", "stressed", "angry"]
+      .filter(mood => totals[mood] > 0)
+      .map(mood => `<span style="display:inline-block; margin-right:8px; padding:2px 8px; border-radius:999px; background:${moodColorMap[mood]}22; color:${moodColorMap[mood]}; font-size:12px; font-weight:600;">${formatMoodLabel(mood)}: ${totals[mood]}</span>`)
+      .join("");
+
+    const entriesRows = entries.length ? entries.map((entry, originalIndex) => ({ entry, originalIndex })).reverse().map(({ entry, originalIndex }, idx) => `
+      <tr>
+        <td>#${entries.length - idx}</td>
+        <td>${entry.date || "—"}</td>
+        <td><strong style="color:${moodColorMap[entry.mood] || "inherit"}">${formatMoodLabel(entry.mood)}</strong></td>
+        <td>${entry.note || "No note added"}</td>
+        <td style="text-align: right;">
+          <button class="admin-delete-btn" data-admin-action="delete-single-entry" data-student-id="${id}" data-entry-index="${originalIndex}" type="button" title="Delete this entry">Delete</button>
+        </td>
+      </tr>
+    `).join("") : '<tr><td colspan="5" style="color:var(--muted); text-align:center; padding:12px;">No mood snapshots recorded yet</td></tr>';
+
+    const clearButtonMarkup = entries.length > 0
+      ? `<button class="entry-action-btn danger" style="padding: 6px 14px; font-size: 13px;" data-admin-action="clear-all-entries" data-student-id="${id}" type="button">Clear All Entries</button>`
+      : "";
+
+    return `
+      <article class="admin-student-card">
+        <div class="admin-student-header">
+          <div>
+            <h3>${name}</h3>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            ${clearButtonMarkup}
+            <span class="admin-student-id-badge">${id === ADMIN_STUDENT_ID ? "ADMIN ID: 6767" : `STUDENT ID: ${id}`}</span>
+          </div>
+        </div>
+
+        <div class="admin-student-stats">
+          <div>Check-ins: <strong>${entries.length}</strong></div>
+          <div>Streak: <strong>${streak}</strong></div>
+          <div>Top Mood: <strong>${topMood}</strong></div>
+        </div>
+
+        ${moodBadges ? `<div>${moodBadges}</div>` : ""}
+
+        <div style="overflow-x: auto;">
+          <table class="admin-entries-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th style="width: 110px;">Date</th>
+                <th style="width: 110px;">Mood</th>
+                <th>Note</th>
+                <th style="width: 80px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entriesRows}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+if (adminStudentList) {
+  adminStudentList.addEventListener("click", event => {
+    if (!isAdmin()) return;
+
+    const deleteSingleBtn = event.target.closest("button[data-admin-action='delete-single-entry']");
+    const clearAllBtn = event.target.closest("button[data-admin-action='clear-all-entries']");
+
+    if (deleteSingleBtn) {
+      const studentId = deleteSingleBtn.dataset.studentId;
+      const entryIndex = Number(deleteSingleBtn.dataset.entryIndex);
+      const studentName = getStudentName(studentId) || `Student ID ${studentId}`;
+      const entries = getStudentEntriesById(studentId);
+      const targetEntry = entries[entryIndex];
+
+      if (!targetEntry) return;
+
+      const confirmed = confirm(`Admin: Delete the ${formatMoodLabel(targetEntry.mood)} entry (${targetEntry.date}) for ${studentName}?`);
+      if (confirmed) {
+        entries.splice(entryIndex, 1);
+        saveStudentEntriesById(studentId, entries);
+        renderAdminStudentList(adminSearchInput?.value || "");
+        if (adminRawTextView && adminRawTextView.style.display !== "none" && adminRawTextContent) {
+          adminRawTextContent.textContent = generateHumanReadableStudentDetailsTxt();
+        }
+      }
+      return;
+    }
+
+    if (clearAllBtn) {
+      const studentId = clearAllBtn.dataset.studentId;
+      const studentName = getStudentName(studentId) || `Student ID ${studentId}`;
+      const confirmed = confirm(`Admin Warning: Permanently delete ALL mood entries for ${studentName} (ID: ${studentId})?`);
+      if (confirmed) {
+        saveStudentEntriesById(studentId, []);
+        renderAdminStudentList(adminSearchInput?.value || "");
+        if (adminRawTextView && adminRawTextView.style.display !== "none" && adminRawTextContent) {
+          adminRawTextContent.textContent = generateHumanReadableStudentDetailsTxt();
+        }
+      }
+    }
+  });
+}
+
+if (adminSearchInput) {
+  adminSearchInput.addEventListener("input", () => {
+    renderAdminStudentList(adminSearchInput.value);
+  });
+}
+
+if (adminDownloadTxtBtn) {
+  adminDownloadTxtBtn.addEventListener("click", () => {
+    downloadStudentDetailsTxt();
+  });
+}
+
+if (adminToggleRawViewBtn) {
+  adminToggleRawViewBtn.addEventListener("click", () => {
+    if (!adminRawTextView) return;
+    const isHidden = adminRawTextView.style.display === "none";
+    adminRawTextView.style.display = isHidden ? "block" : "none";
+    adminToggleRawViewBtn.textContent = isHidden ? "Hide Text View" : "Toggle Text View";
+
+    if (isHidden && adminRawTextContent) {
+      adminRawTextContent.textContent = generateHumanReadableStudentDetailsTxt();
+    }
+  });
+}
+
+// Seed sample students in local storage if fresh so admin 6767 has records to inspect immediately
+function ensureInitialStudentSampleData() {
+  const registry = getRegisteredStudentsMap();
+  if (Object.keys(registry).length === 0) {
+    saveStudentName("1001", "Alex Morgan");
+    saveStudentName("1002", "Sam Taylor");
+    saveStudentName("1003", "Jordan Lee");
+    saveStudentName(ADMIN_STUDENT_ID, "School Wellbeing Admin");
+
+    if (!localStorage.getItem(getStudentStorageKey("1001", "entries"))) {
+      localStorage.setItem(getStudentStorageKey("1001", "entries"), JSON.stringify([
+        { mood: "calm", note: "Ready for the school week ahead.", date: "2026-08-17" },
+        { mood: "happy", note: "Finished science assignment on time.", date: "2026-08-18" },
+        { mood: "calm", note: "Had a quiet study session in the library.", date: "2026-08-19" },
+        { mood: "happy", note: "Great basketball practice at lunch!", date: "2026-08-20" },
+        { mood: "calm", note: "Feeling peaceful and prepared for exams.", date: "2026-08-21" }
+      ]));
+    }
+
+    if (!localStorage.getItem(getStudentStorageKey("1002", "entries"))) {
+      localStorage.setItem(getStudentStorageKey("1002", "entries"), JSON.stringify([
+        { mood: "tired", note: "Stayed up late studying history notes.", date: "2026-08-18" },
+        { mood: "happy", note: "Had a fun lunch with classmates.", date: "2026-08-19" },
+        { mood: "happy", note: "Enjoyed drama class rehearsals.", date: "2026-08-20" },
+        { mood: "calm", note: "Relaxing evening at home.", date: "2026-08-21" }
+      ]));
+    }
+
+    if (!localStorage.getItem(getStudentStorageKey("1003", "entries"))) {
+      localStorage.setItem(getStudentStorageKey("1003", "entries"), JSON.stringify([
+        { mood: "stressed", note: "Big math test coming up tomorrow.", date: "2026-08-19" },
+        { mood: "tired", note: "Exhausted after sports training.", date: "2026-08-20" },
+        { mood: "calm", note: "Test is over, feeling relieved now.", date: "2026-08-21" }
+      ]));
+    }
+  }
+}
+
+ensureInitialStudentSampleData();
+
 // Start the app with the night-sky theme and build the stats view.
 // Start the app using the current student's saved session when available.
 updateActiveStudentBadge();
 
 if (getActiveStudentId()) {
-  openStudentSession(getActiveStudentId());
+  const activeId = getActiveStudentId();
+  const savedName = getStudentName(activeId);
+  if (studentIdInput) studentIdInput.value = activeId;
+  if (studentNameInput) studentNameInput.value = savedName;
+  openStudentSession(activeId, savedName);
 } else {
   applyTheme(themePresets["night-sky"], false);
   resetMoodForm();
