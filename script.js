@@ -287,7 +287,11 @@ function openStudentSession(studentId, studentName) {
   updateMoodThemeModeUI();
   applyStudentTheme(false);
   resetMoodForm();
-  showPage("home");
+  if (trimmedId === ADMIN_STUDENT_ID) {
+    showPage("admin");
+  } else {
+    showPage("home");
+  }
   return true;
 }
 
