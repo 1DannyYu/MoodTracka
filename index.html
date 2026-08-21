@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MoodTracka</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=1.1" />
 </head>
 <body>
   <!-- Main app container that holds all the pages -->
@@ -18,7 +18,7 @@
       <div class="login-card">
         <label class="login-field" for="studentIdInput">
           <span>Student ID</span>
-          <input id="studentIdInput" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter your student ID number" />
+          <input id="studentIdInput" type="text" autocomplete="off" placeholder="Enter student ID number (or 'admin')" />
         </label>
 
         <label class="login-field" for="studentNameInput">
@@ -27,7 +27,7 @@
         </label>
 
         <button id="loginBtn" class="save-btn" type="button">Continue</button>
-        <p id="loginMessage" class="mood-message" aria-live="polite">Use your own student ID and name to open your account.</p>
+        <p id="loginMessage" class="mood-message" aria-live="polite">Use your student ID to log in. (Admin ID: <strong>6767</strong> or type <strong>admin</strong>)</p>
       </div>
     </section>
 
@@ -300,6 +300,6 @@
     </div>
   </main>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=1.1"></script>
 </body>
 </html>

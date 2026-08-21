@@ -33,7 +33,11 @@ function isAdmin() {
 }
 
 function normalizeStudentId(value) {
-  return String(value || "").replace(/\s+/g, "").trim();
+  const str = String(value || "").trim().replace(/\s+/g, "");
+  if (str.toLowerCase() === "admin") {
+    return ADMIN_STUDENT_ID;
+  }
+  return str;
 }
 
 function normalizeStudentName(value) {
@@ -239,13 +243,17 @@ function logoutStudent() {
 
 function openStudentSession(studentId, studentName) {
   const trimmedId = normalizeStudentId(studentId);
-  const trimmedName = (studentName !== undefined && studentName !== null)
+  let trimmedName = (studentName !== undefined && studentName !== null)
     ? normalizeStudentName(studentName)
     : normalizeStudentName(studentNameInput?.value);
 
+  if (trimmedId === ADMIN_STUDENT_ID && !trimmedName) {
+    trimmedName = getStudentName(ADMIN_STUDENT_ID) || "School Wellbeing Admin";
+  }
+
   if (!setActiveStudentId(trimmedId)) {
     if (loginMessage) {
-      loginMessage.textContent = "Enter a valid student ID number to continue.";
+      loginMessage.textContent = "Enter a valid student ID number (or Admin ID: 6767) to continue.";
     }
     return false;
   }
